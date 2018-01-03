@@ -35,13 +35,16 @@ def svm_loss_naive(W, X, y, reg):
       margin = scores[j] - correct_class_score + 1 # note delta = 1
       if margin > 0:
         loss += margin
-
+        dW[:, j] += X[i]
+        dW[:, y[i]] -= X[i] # We will have to subtract this everytime the margin > 0, because the loss function does it the number of times the summation is computed
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
   loss /= num_train
+  dW /= num_train
 
   # Add regularization to the loss.
   loss += reg * np.sum(W * W)
+  dW -= 2 * reg * W
 
   #############################################################################
   # TODO:                                                                     #
@@ -70,7 +73,12 @@ def svm_loss_vectorized(W, X, y, reg):
   # Implement a vectorized version of the structured SVM loss, storing the    #
   # result in loss.                                                           #
   #############################################################################
-  pass
+  num_train = X.shape[0]
+  scores = np.matmul(X, W)
+  correct_class_score = scores[np.arange(len(scores)), y].reshape((1, -1))
+  loss = np.sum(np.maximum(scores - correct_class_score.T + 1, 0)) - num_train
+  loss /= num_train
+  loss += reg * np.sum(np.square(W))
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -85,7 +93,14 @@ def svm_loss_vectorized(W, X, y, reg):
   # to reuse some of the intermediate values that you used to compute the     #
   # loss.                                                                     #
   #############################################################################
-  pass
+  temp = np.maximum(scores - correct_class_score.T + 1, 0)
+  temp[temp > 0] = 1
+  temp[temp < 0] = 0
+  temp[np.arange(num_train), y] -= np.sum(temp, axis = 1).T
+  dW += np.matmul(X.T, temp)
+
+  dW /= num_train
+  dW += 2 * reg * W
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
