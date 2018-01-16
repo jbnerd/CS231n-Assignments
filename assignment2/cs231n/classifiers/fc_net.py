@@ -183,6 +183,10 @@ class FullyConnectedNet(object):
             self.params['W' + str(i+1)] = np.random.normal(scale = weight_scale, size = (prev_dim, next_dim))
             self.params['b' + str(i+1)] = np.zeros(next_dim)
 
+            if self.use_batchnorm:
+                self.params['beta' + str(i+1)] = np.zeros(next_dim)
+                self.params['gamma' + str(i+1)] = np.ones(next_dim)
+
             prev_dim = next_dim
             next_dim = hidden_dims[i]
         
@@ -247,11 +251,16 @@ class FullyConnectedNet(object):
         ############################################################################
         affine_cache = {}
         relu_cache = {}
+        bn_cache = {}
 
         relu = np.reshape(X, (X.shape[0], -1)) # For the consistency of the loop, X has been reshaped and named as relu
         for i in range(self.num_layers - 1):
             affine, affine_cache[str(i+1)] = affine_forward(relu, self.params['W' + str(i+1)], self.params['b' + str(i+1)])
-            relu, relu_cache[str(i+1)] = relu_forward(affine)
+            if self.use_batchnorm:
+                bn_act, bn_cache[str(i+1)] = batchnorm_forward(affine, self.params['gamma' + str(i+1)], self.params['beta' + str(i+1)], self.bn_params[i])
+                relu, relu_cache[str(i+1)] = relu_forward(bn_act)
+            else:
+                relu, relu_cache[str(i+1)] = relu_forward(affine)
         scores, affine_cache[str(self.num_layers)] = affine_forward(relu, self.params['W' + str(self.num_layers)], self.params['b' + str(self.num_layers)])
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -283,7 +292,13 @@ class FullyConnectedNet(object):
 
         for i in range(self.num_layers-1, 0, -1):
             drelu = relu_backward(dhidden, relu_cache[str(i)])
-            dhidden, grads['W' + str(i)], grads['b' + str(i)] = affine_backward(drelu, affine_cache[str(i)])
+            if self.use_batchnorm:
+                dbatchnorm, dgamma, dbeta = batchnorm_backward(drelu, bn_cache[str(i)])
+                dhidden, grads['W' + str(i)], grads['b' + str(i)] = affine_backward(dbatchnorm, affine_cache[str(i)])
+                grads['beta' + str(i)] = dbeta
+                grads['gamma' + str(i)] = dgamma
+            else:
+                dhidden, grads['W' + str(i)], grads['b' + str(i)] = affine_backward(drelu, affine_cache[str(i)])
             grads['W' + str(i)] += self.reg * self.params['W' + str(i)]
             loss += 0.5 * self.reg * (np.sum(np.square(self.params['W' + str(i)])))
         ############################################################################
