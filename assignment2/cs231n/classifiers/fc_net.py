@@ -252,6 +252,7 @@ class FullyConnectedNet(object):
         affine_cache = {}
         relu_cache = {}
         bn_cache = {}
+        dropout_cache = {}
 
         relu = np.reshape(X, (X.shape[0], -1)) # For the consistency of the loop, X has been reshaped and named as relu
         for i in range(self.num_layers - 1):
@@ -261,6 +262,8 @@ class FullyConnectedNet(object):
                 relu, relu_cache[str(i+1)] = relu_forward(bn_act)
             else:
                 relu, relu_cache[str(i+1)] = relu_forward(affine)
+            if self.use_dropout:
+                relu, dropout_cache[str(i+1)] = dropout_forward(relu, self.dropout_param)
         scores, affine_cache[str(self.num_layers)] = affine_forward(relu, self.params['W' + str(self.num_layers)], self.params['b' + str(self.num_layers)])
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -291,6 +294,8 @@ class FullyConnectedNet(object):
         grads['W' + str(self.num_layers)] += self.reg * self.params['W' + str(self.num_layers)]
 
         for i in range(self.num_layers-1, 0, -1):
+            if self.use_dropout:
+                dhidden = dropout_backward(dhidden, dropout_cache[str(i)])
             drelu = relu_backward(dhidden, relu_cache[str(i)])
             if self.use_batchnorm:
                 dbatchnorm, dgamma, dbeta = batchnorm_backward(drelu, bn_cache[str(i)])
